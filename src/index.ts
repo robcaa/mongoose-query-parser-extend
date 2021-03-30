@@ -250,7 +250,57 @@ export class MongooseQueryParser {
    * @param val
    */  
   private castPopulate(val: string) {
-  return "asd";
+  return val.split(",").map(function(qry) {
+    var array = qry.split(".");
+    const insertPopulate = (index = 0) => {
+      if (array[index + 1]) {
+        return {
+          path: array[index],
+          populate: insertPopulate(index + 1),
+        };
+      } else {
+        const i = array[index].indexOf(":");
+        if (i > -1) {
+          let elements = array[index].split(":");
+          const matchCharacterIndex = elements[elements.length - 1].indexOf(
+            "$"
+          );
+          if (matchCharacterIndex !== -1) {
+            const matchString = elements[elements.length - 1].substring(
+              matchCharacterIndex + 1
+            );
+            elements[elements.length - 1] = elements[
+              elements.length - 1
+            ].substring(0, matchCharacterIndex);
+
+            if (matchString.indexOf("~") !== -1) {
+              const matchParts = matchString.split("~");
+              return {
+                path: elements.shift(),
+                select: elements.join(" "),
+                match: {
+                  [matchParts[0]]: { $regex: matchParts[1], $options: "i" },
+                },
+              };
+            } else if (matchString.indexOf("-") !== -1) {
+              const matchParts = matchString.split("-");
+              return {
+                path: elements.shift(),
+                select: elements.join(" "),
+                match: { [matchParts[0]]: matchParts[1] },
+              };
+            }
+          } else {
+            return { path: elements.shift(), select: elements.join(" ") };
+          }
+        } else {
+          return { path: array[index] };
+        }
+      }
+    };
+
+    return insertPopulate();
+  });
 }
 
   /**
